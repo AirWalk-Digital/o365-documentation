@@ -57,10 +57,11 @@ def document():
                                  endpoint= '/' + endpoint + '[' + item['displayName'] + ']')
         foot = flask.render_template('report_table_foot.html')                                
         content = content + head + table + foot
-    html = html + con + footer
+    html = html + content + footer
     return html
 
-def section():
+def section(section):
+    return section
 
 def configuration(api):
     for item in get_api(endpoint)['value']:
