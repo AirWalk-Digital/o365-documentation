@@ -7,6 +7,10 @@ import flask
 from flask_oauthlib.client import OAuth
 from json2html import *
 import config
+import stringcase
+
+import yaml
+import json
 
 APP = flask.Flask(__name__, template_folder='static/templates')
 APP.debug = True
@@ -60,17 +64,58 @@ def document():
     html = html + content + footer
     return html
 
-def section(section):
-    return section
+def process():
+    html = flask.render_template('report_head.html',
+                                 sample='Flask-OAuthlib')
+    footer = flask.render_template('report_foot.html')                                 
+    content = ''
+    with open("o365.yml", 'r') as yaml_in:
+        # data = json.dumps(yaml.load(yaml_in))
+        global data
+        data = json.loads(json.dumps(yaml.load(yaml_in)))
+        content = ''
+        for section_title in data.keys():
+            content = content + section(section_title)
+    html = html + content + footer
+    return html
+    
+def section(section_title):
+    section_html = '<h2>' + stringcase.titlecase(section_title) + '</h2>'
+    # configs = data[section_title]
+    html_content = ''
+    for content_data in data[section_title]:
+            # html_content = html_content + content_title['name']
+            html_content = html_content + content(section_title, content_data)
+    return section_html + html_content
 
-def configuration(api):
+def content(section_title, content_data):
+    api_name = content_data['name']
+    section_html = '<h3>' + stringcase.titlecase(api_name) + '</h3>'
+    apiCall = section_title + '/' + api_name
+    section_html = section_html + '<p> /' + apiCall + '</p>'
+    # configs = data[section_title]
+    # configuration(api_name, content_data)
+    # return section_html 
+    return section_html + configuration(apiCall, content_data)
+    # return section_html + str(get_api(apiCall))
+
+
+def configuration(api, content_data):
+    endpoint = api
+    html = ''
+    primary = content_data['primary']
     for item in get_api(endpoint)['value']:
-        table = json2html.convert(json = item, table_attributes="id=\"info-table\"")
+        item_processed = dict(sorted(item.items()))
+        for remove_item in content_data['exclude']:
+            # If key exist in dictionary then delete it using del.
+            if remove_item in item_processed:
+                del item_processed[remove_item]
+        table = json2html.convert(json = item_processed, table_attributes="id=\"info-table\"")
         head = flask.render_template('report_table_head.html',
-                                 endpoint= '/' + endpoint + '[' + item['displayName'] + ']')
+                                 item_name= item[primary] )
         foot = flask.render_template('report_table_foot.html')                                
-        return head + table + foot
-
+        html = html + head + table + foot
+    return html
 
 def get_api(api):
     endpoint = api
@@ -95,6 +140,12 @@ def graphcall():
                                  graphdata=graphdata,
                                  endpoint=config.RESOURCE + config.API_VERSION + '/' + endpoint,
                                  sample='Flask-OAuthlib')
+
+
+@APP.route('/test')
+def testing():
+    return process()
+  
 
 @MSGRAPH.tokengetter
 def get_token():

@@ -1,8 +1,8 @@
 deviceManagement:
-  - deviceConfigurations:
-      primary: displayName
-      exclude:
-        - @odata.type
-        - id
-        - lastModifiedDateTime
-        - createdDateTime
+  - name: deviceConfigurations
+    primary: displayName
+    exclude:
+      - '@odata.type'
+      - id
+      - lastModifiedDateTime
+      - createdDateTime

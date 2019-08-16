@@ -7,3 +7,5 @@ adal>=1.0.0
 
 # other stuff
 json2html
+stringcase
+pyyaml
