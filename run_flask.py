@@ -8,6 +8,9 @@ from flask_oauthlib.client import OAuth
 from json2html import *
 import config
 import stringcase
+from requests import get
+from requests_oauthlib import OAuth2Session
+
 
 import yaml
 import json
@@ -23,6 +26,7 @@ MSGRAPH = OAUTH.remote_app(
     request_token_url=None, access_token_method='POST',
     access_token_url=config.AUTHORITY_URL + config.TOKEN_ENDPOINT,
     authorize_url=config.AUTHORITY_URL + config.AUTH_ENDPOINT)
+
 
 @APP.route('/')
 def homepage():
@@ -42,7 +46,7 @@ def authorized():
         raise Exception('state returned to redirect URL does not match!')
     response = MSGRAPH.authorized_response()
     flask.session['access_token'] = response['access_token']
-    return flask.redirect('/document')
+    return flask.redirect('/test')
 
 @APP.route('/document')
 def document():
@@ -91,7 +95,11 @@ def section(section_title):
 def content(section_title, content_data):
     api_name = content_data['name']
     section_html = '<h3>' + stringcase.titlecase(api_name) + '</h3>'
-    apiCall = section_title + '/' + api_name
+    if section_title == 'general':
+        apiCall = api_name
+    else:
+        apiCall = section_title + '/' + api_name
+
     section_html = section_html + '<p> /' + apiCall + '</p>'
     # configs = data[section_title]
     # configuration(api_name, content_data)
@@ -104,46 +112,58 @@ def configuration(api, content_data):
     endpoint = api
     html = ''
     primary = content_data['primary']
-    for item in get_api(endpoint)['value']:
-        item_processed = dict(sorted(item.items()))
-        for remove_item in content_data['exclude']:
-            # If key exist in dictionary then delete it using del.
-            if remove_item in item_processed:
-                del item_processed[remove_item]
-        # remove None, NotConfigured and blank items
-        trimmed = item_processed
-        for key, value in item_processed.copy().items():
-            if str(value) == 'None':
-                del trimmed[key]
-            elif str(value) == 'notConfigured':
-                del trimmed[key]
-            elif str(value) == '':
-                del trimmed[key]
-            elif str(value) is None:
-                del trimmed[key]
-            elif str(value) == '[]':
-                del trimmed[key]
+    try:
+        for item in get_api(endpoint)['value']:
+            item_processed = dict(sorted(item.items()))
+            for remove_item in content_data['exclude']:
+                # If key exist in dictionary then delete it using del.
+                if remove_item in item_processed:
+                    del item_processed[remove_item]
+            # remove None, NotConfigured and blank items
+            trimmed = item_processed
+            for key, value in item_processed.copy().items():
+                if str(value) == 'None':
+                    del trimmed[key]
+                elif str(value) == 'notConfigured':
+                    del trimmed[key]
+                elif str(value) == '':
+                    del trimmed[key]
+                elif str(value) is None:
+                    del trimmed[key]
+                elif str(value) == '[]':
+                    del trimmed[key]
 
-        table = json2html.convert(json = trimmed, table_attributes="class=\"leftheader-table\"")
-        cmd = ''
-        if 'powershell' in content_data:
-            cmd = generate_powershell(content_data['powershell'], trimmed )
+            table = json2html.convert(json = trimmed, table_attributes="class=\"leftheader-table\"")
+            cmd = ''
+            if 'powershell' in content_data:
+                cmd = generate_powershell(content_data['powershell'], trimmed )
 
-        head = flask.render_template('report_table_head.html',
-                                 powershell=cmd,
-                                 item_name= item[primary] )
-        foot = flask.render_template('report_table_foot.html')                                
-        html = html + head + table + foot
+            head = flask.render_template('report_table_head.html',
+                                    powershell=cmd,
+                                    item_name= item[primary] )
+            foot = flask.render_template('report_table_foot.html')                                
+            html = html + head + table + foot
+            pass
+    except TypeError as identifier:
+        html = str(identifier) + str(get_api(endpoint))
+    except KeyError as identifier:
+        html = str(identifier) + str(get_api(endpoint))
     return html
 
+# def get_api_old(api):
+#     endpoint = api
+#     headers = {'SdkVersion': 'sample-python-flask',
+#                'x-client-SKU': 'sample-python-flask',
+#                'client-request-id': str(uuid.uuid4()),
+#                'return-client-request-id': 'true'}
+#     graphdata = MSGRAPH.get(endpoint, headers=headers).data
+#     return graphdata
+
 def get_api(api):
-    endpoint = api
-    headers = {'SdkVersion': 'sample-python-flask',
-               'x-client-SKU': 'sample-python-flask',
-               'client-request-id': str(uuid.uuid4()),
-               'return-client-request-id': 'true'}
-    graphdata = MSGRAPH.get(endpoint, headers=headers).data
-    return graphdata
+    if api.startswith("general/"):
+        api = api.replace("general/", "")
+    return proxy(api)
+
 
 def generate_powershell_old(powershell, item_processed ):
     # cmd = powershell
@@ -175,9 +195,20 @@ def generate_powershell(powershell, item_processed ):
     return ''
 
 
+@APP.route('/', defaults={'path': ''})
+@APP.route('/msGraph/<path:path>')
+def proxy(path):
+    endpoint = path
+    headers = {'SdkVersion': 'sample-python-flask',
+               'x-client-SKU': 'sample-python-flask',
+               'client-request-id': str(uuid.uuid4()),
+               'return-client-request-id': 'true'}
+    return MSGRAPH.get(endpoint, headers=headers).data
+
+
 
 @APP.route('/deviceManagement/deviceConfigurations')
-def graphcall():
+def deviceManagement_deviceConfigurations():
     """Confirm user authentication by calling Graph and displaying some data."""
     endpoint = 'me'
     endpoint = 'deviceManagement/deviceConfigurations'
@@ -185,12 +216,8 @@ def graphcall():
                'x-client-SKU': 'sample-python-flask',
                'client-request-id': str(uuid.uuid4()),
                'return-client-request-id': 'true'}
-    graphdata = MSGRAPH.get(endpoint, headers=headers).data
-    return flask.render_template('graphcall.html',
-                                 graphdata=graphdata,
-                                 endpoint=config.RESOURCE + config.API_VERSION + '/' + endpoint,
-                                 sample='Flask-OAuthlib')
-
+    return MSGRAPH.get(endpoint, headers=headers).data
+    
 
 @APP.route('/test')
 def testing():

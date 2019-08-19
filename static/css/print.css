@@ -352,6 +352,13 @@ table tr:last-child td:last-child {
   padding: 5px;
 }
 
+.leftheader-table th {
+  text-align: left;
+}
+
+
+
+
 .leftheader-table tr th {
   /* border-right: 1px dotted #dddddd; */
   border-bottom: 1px dotted #dddddd;
