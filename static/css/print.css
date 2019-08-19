@@ -317,8 +317,6 @@ table tr td:last-child {
 table tbody tr:last-child td {
   border-bottom: 1px solid #002b3d;
 }
-
-
 table tr:first-child th:first-child {
   border-top-left-radius: 6px;
 }
@@ -337,6 +335,68 @@ table tr:last-child td:first-child {
 table tr:last-child td:last-child {
   border-bottom-right-radius: 6px;
 }      
+
+
+
+/* headerless table */
+
+.leftheader-table tr th {
+  background: white;
+  color: #393939;
+  padding: 5px;
+  border-top: 0px solid #002b3d;
+}
+.leftheader-table tr td {
+  /* border-right: 1px dotted #dddddd; */
+  border-bottom: 1px dotted #dddddd;
+  padding: 5px;
+}
+
+.leftheader-table tr th {
+  /* border-right: 1px dotted #dddddd; */
+  border-bottom: 1px dotted #dddddd;
+  padding: 5px;
+}
+
+/* top-left border-radius */
+.leftheader-table tr:first-child th:first-child {
+  border-top-left-radius: 10px;
+  border-top: 2px solid #002b3d;
+  border-left: 2px solid #002b3d;
+}
+
+/* left border */
+.leftheader-table tr th:first-child  {
+  border-left: 2px solid #002b3d;
+}
+
+/* right border */
+.leftheader-table tr td:last-child  {
+  border-right: 2px solid #002b3d;
+}
+
+/* top-right border-radius */
+.leftheader-table tr:first-child td:last-child {
+  border-top-right-radius: 10px;
+  border-top: 2px solid #002b3d;
+  border-right: 2px solid #002b3d;
+
+}
+
+/* bottom-left border-radius */
+.leftheader-table tr:last-child th:first-child {
+  border-bottom-left-radius: 10px;
+  border-bottom: 2px solid #002b3d;
+  border-left: 2px solid #002b3d;
+}
+
+/* bottom-right border-radius */
+.leftheader-table tr:last-child td:last-child {
+  border-bottom-right-radius: 10px;
+  border-bottom: 2px solid #002b3d;
+  border-right: 2px solid #002b3d;
+}   
+
 /* 
   html body table { 
     border: 1px solid #002b3d; 

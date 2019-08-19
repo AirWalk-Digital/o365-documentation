@@ -110,8 +110,27 @@ def configuration(api, content_data):
             # If key exist in dictionary then delete it using del.
             if remove_item in item_processed:
                 del item_processed[remove_item]
-        table = json2html.convert(json = item_processed, table_attributes="id=\"info-table\"")
+        # remove None, NotConfigured and blank items
+        trimmed = item_processed
+        for key, value in item_processed.copy().items():
+            if str(value) == 'None':
+                del trimmed[key]
+            elif str(value) == 'notConfigured':
+                del trimmed[key]
+            elif str(value) == '':
+                del trimmed[key]
+            elif str(value) is None:
+                del trimmed[key]
+            elif str(value) == '[]':
+                del trimmed[key]
+
+        table = json2html.convert(json = trimmed, table_attributes="class=\"leftheader-table\"")
+        cmd = ''
+        if 'powershell' in content_data:
+            cmd = generate_powershell(content_data['powershell'], trimmed )
+
         head = flask.render_template('report_table_head.html',
+                                 powershell=cmd,
                                  item_name= item[primary] )
         foot = flask.render_template('report_table_foot.html')                                
         html = html + head + table + foot
@@ -125,6 +144,37 @@ def get_api(api):
                'return-client-request-id': 'true'}
     graphdata = MSGRAPH.get(endpoint, headers=headers).data
     return graphdata
+
+def generate_powershell_old(powershell, item_processed ):
+    # cmd = powershell
+    cmd = "$hashtable = @{"
+    for key, value in item_processed.items():
+        if str(value) != 'None':
+            if str(value) == 'True':
+                cmd = cmd + key + " = '$True'\n"   
+            elif str(value) == 'False':
+                cmd = cmd + key + " = '$False'\n"  
+            else:
+                cmd = cmd + key + " = '" + str(value) + "'\n"
+
+    cmd = cmd + "}\n" + powershell + " $hashtable"
+    return cmd
+
+def generate_powershell(powershell, item_processed ):
+    # cmd = powershell
+    cmd = powershell + " "
+    for key, value in item_processed.items():
+        if str(value) != 'None':
+            if str(value) == 'True':
+                cmd = cmd + "-" + key + " $True "   
+            elif str(value) == 'False':
+                cmd = cmd + "-" + key + " $False "  
+            else:
+                cmd = cmd + "-" + key + " '" + str(value) + "'"
+    # return cmd
+    return ''
+
+
 
 @APP.route('/deviceManagement/deviceConfigurations')
 def graphcall():

@@ -1,8 +1,11 @@
 deviceManagement:
   - name: deviceConfigurations
     primary: displayName
+    powershell: New-DeviceManagement_DeviceConfigurations
     exclude:
-      - '@odata.type'
+      # - '@odata.type'
       - id
       - lastModifiedDateTime
       - createdDateTime
+      - version
+      - edgeHomepageUrls # Temp
