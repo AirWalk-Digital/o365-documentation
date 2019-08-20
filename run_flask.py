@@ -73,24 +73,31 @@ def process():
                                  sample='Flask-OAuthlib')
     footer = flask.render_template('report_foot.html')                                 
     content = ''
+    code = 0
     with open("o365.yml", 'r') as yaml_in:
         # data = json.dumps(yaml.load(yaml_in))
         global data
         data = json.loads(json.dumps(yaml.load(yaml_in)))
-        content = ''
         for section_title in data.keys():
-            content = content + section(section_title)
+            content_new, code = section(section_title)
+            content = content + content_new
     html = html + content + footer
-    return html
+    if code == 403:
+        return flask.redirect('/login')
+    else:
+        return html
     
 def section(section_title):
     section_html = '<h2>' + stringcase.titlecase(section_title) + '</h2>'
     # configs = data[section_title]
     html_content = ''
+    code = 200
     for content_data in data[section_title]:
             # html_content = html_content + content_title['name']
-            html_content = html_content + content(section_title, content_data)
-    return section_html + html_content
+            content_html, code_out = content(section_title, content_data)
+            if code_out != 200: code = code_out
+            html_content = html_content + content_html
+    return section_html + html_content, code
 
 def content(section_title, content_data):
     api_name = content_data['name']
@@ -103,35 +110,37 @@ def content(section_title, content_data):
     section_html = section_html + '<p> /' + apiCall + '</p>'
     # configs = data[section_title]
     # configuration(api_name, content_data)
-    # return section_html 
-    return section_html + configuration(apiCall, content_data)
+    # return section_html
+    content, code = configuration(apiCall, content_data)
+    return section_html + content, code
     # return section_html + str(get_api(apiCall))
 
-
-def configuration(api, content_data):
+def configuration2(api, content_data):
     endpoint = api
     html = ''
     primary = content_data['primary']
     try:
-        for item in get_api(endpoint)['value']:
-            item_processed = dict(sorted(item.items()))
-            for remove_item in content_data['exclude']:
-                # If key exist in dictionary then delete it using del.
-                if remove_item in item_processed:
-                    del item_processed[remove_item]
-            # remove None, NotConfigured and blank items
-            trimmed = item_processed
-            for key, value in item_processed.copy().items():
-                if str(value) == 'None':
-                    del trimmed[key]
-                elif str(value) == 'notConfigured':
-                    del trimmed[key]
-                elif str(value) == '':
-                    del trimmed[key]
-                elif str(value) is None:
-                    del trimmed[key]
-                elif str(value) == '[]':
-                    del trimmed[key]
+        result = get_api(endpoint)
+        if result.get('value'):
+            for item in get_api(endpoint)['value']:
+                item_processed = dict(sorted(item.items()))
+                for remove_item in content_data['exclude']:
+                    # If key exist in dictionary then delete it using del.
+                    if remove_item in item_processed:
+                        del item_processed[remove_item]
+                # remove None, NotConfigured and blank items
+                trimmed = item_processed
+                for key, value in item_processed.copy().items():
+                    if str(value) == 'None':
+                        del trimmed[key]
+                    elif str(value) == 'notConfigured':
+                        del trimmed[key]
+                    elif str(value) == '':
+                        del trimmed[key]
+                    elif str(value) is None:
+                        del trimmed[key]
+                    elif str(value) == '[]':
+                        del trimmed[key]
 
             table = json2html.convert(json = trimmed, table_attributes="class=\"leftheader-table\"")
             cmd = ''
@@ -150,6 +159,50 @@ def configuration(api, content_data):
         html = str(identifier) + str(get_api(endpoint))
     return html
 
+
+
+def configuration(api, content_data):
+    endpoint = api
+    html = ''
+    code = 200
+    primary = content_data['primary']
+    result = get_api(endpoint)
+     
+    if result.get('value'):
+        for item in result['value']:
+            # write the table header with the primary key (usually displayName) as the title
+            table_head = flask.render_template('report_table_head.html',
+                                    powershell='',
+                                    item_name=item[primary] )
+            table_foot = flask.render_template('report_table_foot.html') 
+            item_processed = dict(sorted(item.items()))
+            # remove any key from the 'exclude' section in the config
+            if content_data.get('exclude'):
+                for remove_item in content_data['exclude']:
+                    # If key exist in dictionary then delete it using del.
+                    if remove_item in item_processed:
+                        del item_processed[remove_item]    
+            # trim any null, None or empty values
+            trimmed = trim_vaules(item_processed)
+            # convert the json to a table
+            table = json2html.convert(json = trimmed, table_attributes="class=\"leftheader-table\"")
+
+            html = html + table_head + table + table_foot
+    else:
+        if result.get('error'):
+            if result['error']['code']:
+                result = result['error']['code']
+        table_head = flask.render_template('report_table_head.html',
+                                    powershell='',
+                                    item_name='Bad Structure' )
+        table_foot = flask.render_template('report_table_foot.html') 
+        html = html + table_head + str(result) + table_foot
+        if result == 'InvalidAuthenticationToken':
+            code = 403
+
+    
+    return html, code
+
 # def get_api_old(api):
 #     endpoint = api
 #     headers = {'SdkVersion': 'sample-python-flask',
@@ -158,6 +211,21 @@ def configuration(api, content_data):
 #                'return-client-request-id': 'true'}
 #     graphdata = MSGRAPH.get(endpoint, headers=headers).data
 #     return graphdata
+
+def trim_vaules(item_processed):
+    trimmed = item_processed
+    for key, value in item_processed.copy().items():
+        if str(value) == 'None':
+            del trimmed[key]
+        elif str(value) == 'notConfigured':
+            del trimmed[key]
+        elif str(value) == '':
+            del trimmed[key]
+        elif str(value) is None:
+            del trimmed[key]
+        elif str(value) == '[]':
+            del trimmed[key]
+    return trimmed
 
 def get_api(api):
     if api.startswith("general/"):
