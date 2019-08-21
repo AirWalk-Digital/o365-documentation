@@ -1,0 +1,15 @@
+<html>
+<body>
+    <div><p>Config saved as {{ filename }}. You will be redirected in <div id="counter"><b>5</b></div> seconds to {{ location }}</p></div>
+    <script>
+        setInterval(function() {
+            var div = document.querySelector("#counter");
+            var count = div.textContent * 1 - 1;
+            div.textContent = count;
+            if (count <= 0) {
+                window.location.replace("{{ location }}");
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

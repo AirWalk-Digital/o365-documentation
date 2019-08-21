@@ -11,9 +11,15 @@ import stringcase
 from requests import get
 from requests_oauthlib import OAuth2Session
 
+import datetime
 
 import yaml
 import json
+import os
+import errno
+import numpy as np
+import pandas as pd
+
 
 APP = flask.Flask(__name__, template_folder='static/templates')
 APP.debug = True
@@ -173,20 +179,53 @@ def configuration(api, content_data):
             # write the table header with the primary key (usually displayName) as the title
             table_head = flask.render_template('report_table_head.html',
                                     powershell='',
+                                    download_link=api + '?id=' + item['id'] + '&name=' +item[primary] , 
                                     item_name=item[primary] )
-            table_foot = flask.render_template('report_table_foot.html') 
-            item_processed = dict(sorted(item.items()))
-            # remove any key from the 'exclude' section in the config
+            table_foot = flask.render_template('report_table_foot.html')
+            item_processed = dict(item.items())
+            #remove any key from the 'exclude' section in the config
             if content_data.get('exclude'):
                 for remove_item in content_data['exclude']:
                     # If key exist in dictionary then delete it using del.
                     if remove_item in item_processed:
                         del item_processed[remove_item]    
             # trim any null, None or empty values
-            trimmed = trim_vaules(item_processed)
-            # convert the json to a table
-            table = json2html.convert(json = trimmed, table_attributes="class=\"leftheader-table\"")
+            trimmed = item_processed
+            for key, value in item_processed.copy().items():
+                if str(value) == 'None':
+                    del trimmed[key]
+                elif str(value) == 'notConfigured':
+                    del trimmed[key]
+                elif str(value) == '':
+                    del trimmed[key]
+                elif str(value) is None:
+                    del trimmed[key]
+                elif str(value) == '[]':
+                    del trimmed[key]
 
+            compared_table = check_existing(trimmed.items(), endpoint, item[primary])
+
+            okstr = '<td>OK</td>'
+            okstr_new = '<td bgcolor="#00FF00">OK</td>'
+            errorstr = '<td>Error</td>'
+            errorstr_new = '<td bgcolor="#FF0000">Error</td>'
+
+            # remove any key from the 'exclude' section in the config
+            # if content_data.get('exclude'):
+            #     for remove_item in content_data['exclude']:
+            #         # If key exist in dictionary then delete it using del.
+            #         if remove_item in item_processed:
+            #             del item_processed[remove_item]    
+            # # trim any null, None or empty values
+            # trimmed = trim_vaules(item_processed)
+            # convert the json to a table
+            # table = json2html.convert(json = trimmed, table_attributes="class=\"leftheader-table\"")
+            # table = json2html.convert(json = compared_table, table_attributes="class=\"leftheader-table\"")
+            table = compared_table.to_html(index=False)
+
+            table = table.replace(okstr, okstr_new)
+            table = table.replace(errorstr, errorstr_new)
+            # table = str(compared_table)
             html = html + table_head + table + table_foot
     else:
         if result.get('error'):
@@ -203,14 +242,46 @@ def configuration(api, content_data):
     
     return html, code
 
-# def get_api_old(api):
-#     endpoint = api
-#     headers = {'SdkVersion': 'sample-python-flask',
-#                'x-client-SKU': 'sample-python-flask',
-#                'client-request-id': str(uuid.uuid4()),
-#                'return-client-request-id': 'true'}
-#     graphdata = MSGRAPH.get(endpoint, headers=headers).data
-#     return graphdata
+def check_existing(table, api, name):
+    # load template
+    path = 'config/msGraph/' + api + '/' + name
+    table3d = ''
+    
+
+    # table3d = {}
+
+    try:
+        # f=open(path,"r")
+        with open(path, 'r') as f:
+            parsed_json = json.load(f)
+        a = np.empty([1,3])
+        sys.stdout.write('line 2 to stdout  ')
+        header = ['Setting', 'Vaule', 'Baseline']
+        for key, value in table:
+            if str(value) == str(parsed_json[key]):
+                good = 'OK'
+            else: 
+                good = 'Error'
+            a = np.append(a, [[str(key), str(value), good ]], axis = 0)
+
+        a = np.delete(a, 0, axis=0)
+        print(str(a))
+        df = pd.DataFrame(a,index=a[:, 0], columns=header)
+        df.set_index(df.columns[0])
+
+    except FileNotFoundError:
+        a = np.empty([1,2])
+        header = ['Setting', 'Vaule']
+        for key, value in table:
+            a = np.append(a, [[str(key), str(value)]], axis = 0)
+        a = np.delete(a, 0, axis=0) # delete the empty first row
+        df = pd.DataFrame(a, columns=header)
+
+    return df
+
+
+
+
 
 def trim_vaules(item_processed):
     trimmed = item_processed
@@ -273,7 +344,37 @@ def proxy(path):
                'return-client-request-id': 'true'}
     return MSGRAPH.get(endpoint, headers=headers).data
 
+@APP.route('/download/msGraph/<path:path>')
+def download(path):
+    endpoint = path
+    headers = {'SdkVersion': 'sample-python-flask',
+               'x-client-SKU': 'sample-python-flask',
+               'client-request-id': str(uuid.uuid4()),
+               'return-client-request-id': 'true'}
+    graph = MSGRAPH.get(endpoint, headers=headers).data
+    error = "{'error': {'code': 'invalidParams','message': 'Invalid Parameters passed to download API','innerError': {'request-id': 'TBD','date': '" + str(datetime.datetime.now()) +"'} } }"
+    if flask.request.args.get('name') and flask.request.args.get('id'):    
+        filename = 'config/msGraph/' + path + '/' + flask.request.args.get('name')
+        itemtosave = graph['value']
+        itemtosave = [itemtosave for itemtosave in itemtosave if itemtosave['id'] == flask.request.args.get('id')][0]
+        savefile(filename, itemtosave)
+        return flask.render_template('redirect.html',
+                                    filename=filename,
+                                    location=flask.request.referrer )
+    else:
+        return error
 
+def savefile(path, data):
+    if not os.path.exists(os.path.dirname(path)):
+        try:
+            os.makedirs(os.path.dirname(path))
+        except OSError as exc: # Guard against race condition
+            if exc.errno != errno.EEXIST:
+                raise
+    with open(path, 'w') as f:
+        json.dump(data, f)
+    
+    
 
 @APP.route('/deviceManagement/deviceConfigurations')
 def deviceManagement_deviceConfigurations():
