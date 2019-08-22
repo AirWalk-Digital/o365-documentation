@@ -176,13 +176,8 @@ def configuration(api, content_data):
      
     if result.get('value'):
         for item in result['value']:
-            # write the table header with the primary key (usually displayName) as the title
-            table_head = flask.render_template('report_table_head.html',
-                                    powershell='',
-                                    download_link=api + '?id=' + item['id'] + '&name=' +item[primary] , 
-                                    item_name=item[primary] )
-            table_foot = flask.render_template('report_table_foot.html')
             item_processed = dict(item.items())
+            trimmed = item_processed
             #remove any key from the 'exclude' section in the config
             if content_data.get('exclude'):
                 for remove_item in content_data['exclude']:
@@ -190,7 +185,7 @@ def configuration(api, content_data):
                     if remove_item in item_processed:
                         del item_processed[remove_item]    
             # trim any null, None or empty values
-            trimmed = item_processed
+    
             for key, value in item_processed.copy().items():
                 if str(value) == 'None':
                     del trimmed[key]
@@ -222,10 +217,19 @@ def configuration(api, content_data):
             # table = json2html.convert(json = trimmed, table_attributes="class=\"leftheader-table\"")
             # table = json2html.convert(json = compared_table, table_attributes="class=\"leftheader-table\"")
             table = compared_table.to_html(index=False)
-
             table = table.replace(okstr, okstr_new)
             table = table.replace(errorstr, errorstr_new)
-            # table = str(compared_table)
+            print(content_data)
+            if content_data.get('powershell'):
+                cmd = generate_powershell(content_data['powershell'], trimmed )
+            else:
+                cmd = ''
+            # write the table header with the primary key (usually displayName) as the title
+            table_head = flask.render_template('report_table_head.html',
+                                    powershell=cmd,
+                                    download_link=api + '?id=' + item['id'] + '&name=' +item[primary] , 
+                                    item_name=item[primary] )
+            table_foot = flask.render_template('report_table_foot.html')
             html = html + table_head + table + table_foot
     else:
         if result.get('error'):
@@ -259,7 +263,6 @@ def check_existing(table, api, name):
             a = np.append(a, [[str(key), str(value), good ]], axis = 0)
 
         a = np.delete(a, 0, axis=0)
-        print(str(a))
         df = pd.DataFrame(a,index=a[:, 0], columns=header)
         df.set_index(df.columns[0])
 
@@ -317,15 +320,16 @@ def generate_powershell(powershell, item_processed ):
     # cmd = powershell
     cmd = powershell + " "
     for key, value in item_processed.items():
-        if str(value) != 'None':
+        if str(key) == '@odata.type':
+            cmd = cmd + '-' + str(value).replace('#microsoft.graph.', '') + ' '
+        elif str(value) != 'None' and str(value) != '' :
             if str(value) == 'True':
-                cmd = cmd + "-" + key + " $True "   
+                cmd = cmd + " -" + key + " $True"   
             elif str(value) == 'False':
-                cmd = cmd + "-" + key + " $False "  
+                cmd = cmd + " -" + key + " $False"  
             else:
-                cmd = cmd + "-" + key + " '" + str(value) + "'"
-    # return cmd
-    return ''
+                cmd = cmd + " -" + key + " '" + str(value) + "'"
+    return cmd
 
 
 @APP.route('/', defaults={'path': ''})
