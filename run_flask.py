@@ -198,13 +198,16 @@ def configuration(api, content_data):
                 elif str(value) == '[]':
                     del trimmed[key]
 
-            compared_table = check_existing(trimmed.items(), endpoint, item[primary])
+            compared_table, existing_policy = check_existing(trimmed.items(), endpoint, item[primary])
 
             okstr = '<td>OK</td>'
             okstr_new = '<td bgcolor="#00FF00">OK</td>'
             errorstr = '<td>Error</td>'
             errorstr_new = '<td bgcolor="#FF0000">Error</td>'
-
+            if existing_policy == True:
+                hide_reapply = 'block'
+            else:
+                hide_reapply = 'none'
             # remove any key from the 'exclude' section in the config
             # if content_data.get('exclude'):
             #     for remove_item in content_data['exclude']:
@@ -219,7 +222,6 @@ def configuration(api, content_data):
             table = compared_table.to_html(index=False)
             table = table.replace(okstr, okstr_new)
             table = table.replace(errorstr, errorstr_new)
-            print(content_data)
             if content_data.get('powershell'):
                 cmd = generate_powershell(content_data['powershell'], trimmed )
             else:
@@ -228,6 +230,7 @@ def configuration(api, content_data):
             table_head = flask.render_template('report_table_head.html',
                                     powershell=cmd,
                                     download_link=api + '?id=' + item['id'] + '&name=' +item[primary] , 
+                                    reapply_hidden=hide_reapply,
                                     item_name=item[primary] )
             table_foot = flask.render_template('report_table_foot.html')
             html = html + table_head + table + table_foot
@@ -245,6 +248,29 @@ def configuration(api, content_data):
 
     
     return html, code
+
+def trim_policy(item_processed, content_data):
+    trimmed = item_processed
+    #remove any key from the 'exclude' section in the config
+    if content_data.get('exclude'):
+        for remove_item in content_data['exclude']:
+            # If key exist in dictionary then delete it using del.
+            if remove_item in item_processed:
+                del item_processed[remove_item]    
+    # trim any null, None or empty values
+
+    for key, value in item_processed.copy().items():
+        if str(value) == 'None':
+            del trimmed[key]
+        elif str(value) == 'notConfigured':
+            del trimmed[key]
+        elif str(value) == '':
+            del trimmed[key]
+        elif str(value) is None:
+            del trimmed[key]
+        elif str(value) == '[]':
+            del trimmed[key]
+    return trimmed
 
 def check_existing(table, api, name):
     # load template
@@ -265,7 +291,7 @@ def check_existing(table, api, name):
         a = np.delete(a, 0, axis=0)
         df = pd.DataFrame(a,index=a[:, 0], columns=header)
         df.set_index(df.columns[0])
-
+        existing = True
     except FileNotFoundError:
         a = np.empty([1,2])
         header = ['Setting', 'Vaule']
@@ -273,8 +299,8 @@ def check_existing(table, api, name):
             a = np.append(a, [[str(key), str(value)]], axis = 0)
         a = np.delete(a, 0, axis=0) # delete the empty first row
         df = pd.DataFrame(a, columns=header)
-
-    return df
+        existing = False
+    return df, existing
 
 
 
@@ -357,8 +383,9 @@ def download(path):
         itemtosave = [itemtosave for itemtosave in itemtosave if itemtosave['id'] == flask.request.args.get('id')][0]
         savefile(filename, itemtosave)
         return flask.render_template('redirect.html',
-                                    filename=filename,
-                                    location=flask.request.referrer )
+                                    message='Your file has been saved as ' + filename + '.',
+                                    location=flask.request.referrer,
+                                    data=str(itemtosave) )
     else:
         return error
 
@@ -372,7 +399,49 @@ def savefile(path, data):
     with open(path, 'w') as f:
         json.dump(data, f)
     
-    
+@APP.route('/reapply/msGraph/<path:path>') # reapply from the template
+def reapply(path):
+    endpoint = path
+    headers = {'SdkVersion': 'sample-python-flask',
+               'x-client-SKU': 'sample-python-flask',
+               'client-request-id': str(uuid.uuid4()),
+               'return-client-request-id': 'true'}
+    graph = MSGRAPH.get(endpoint, headers=headers).data
+    error = "{'error': {'code': 'invalidParams','message': 'Invalid Parameters passed to download API','innerError': {'request-id': 'TBD','date': '" + str(datetime.datetime.now()) +"'} } }"
+    if flask.request.args.get('name') and flask.request.args.get('id'):
+        data, existing = generate_replacement_json(flask.request.args.get('id'), path, flask.request.args.get('name'))
+        if existing == True:
+            resp = MSGRAPH.post(endpoint, headers=headers, data=data)
+            print('-----')
+            print(str(resp.status))
+            if resp.status == 200:
+                msg = 'Successfully updated policy.'
+                error = 'No error'
+            else:
+                msg = 'Error updatging policy.'
+                error = str(resp.data)
+            return flask.render_template('redirect.html',
+                                    message=msg,
+                                    location=flask.request.referrer,
+                                    error=error,
+                                    data=str(data))
+    else:
+        return error    
+
+def generate_replacement_json(existing_id, api, name):
+    # load template
+    path = 'config/msGraph/' + api + '/' + name
+    jsonpolicy = ''
+    try:
+        with open(path, 'r') as f:
+            parsed_json = json.load(f)
+        existing = True
+        parsed_json['id'] = existing_id
+        jsonpolicy = parsed_json
+    except FileNotFoundError:
+        existing = False
+    return jsonpolicy, existing
+
 
 @APP.route('/deviceManagement/deviceConfigurations')
 def deviceManagement_deviceConfigurations():

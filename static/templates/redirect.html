@@ -1,15 +1,38 @@
 <html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microsoft Azure and Office 365 Documentation</title>
+    <!-- <link rel="stylesheet" type="text/css" href="/static/css/bootstrap.min.css" /> -->
+    <link rel="stylesheet" type="text/css" href="/static/css/print.css" />
+    <style type="text/css">
+    pre {
+        overflow-x: auto;
+        white-space: pre-wrap;
+        white-space: -moz-pre-wrap;
+        white-space: -pre-wrap;
+        white-space: -o-pre-wrap;
+        word-wrap: break-word;
+        }
+        </style>
+</head>
 <body>
-    <div><p>Config saved as {{ filename }}. You will be redirected in <div id="counter"><b>5</b></div> seconds to {{ location }}</p></div>
+    <h2>{{ message }}.</h2> 
+    <div>
+    <p>You will be redirected in <b id="counter">20</b> seconds to {{ location }}</p></div>
     <script>
         setInterval(function() {
-            var div = document.querySelector("#counter");
-            var count = div.textContent * 1 - 1;
-            div.textContent = count;
+            var b = document.querySelector("#counter");
+            var count = b.textContent * 1 - 1;
+            b.textContent = count;
             if (count <= 0) {
                 window.location.replace("{{ location }}");
             }
         }, 1000);
     </script>
+    <h4>Error</h4>
+    <pre>{{error}}</pre>
+    <h4>Data</h4>
+    <pre>{{data}}</pre>
 </body>
 </html>

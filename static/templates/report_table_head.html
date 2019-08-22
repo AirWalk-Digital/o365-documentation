@@ -1,5 +1,7 @@
 
         <div class="container homepage-container">
-            <h4>{{ item_name }}<a href="/download/msGraph/{{ download_link}}" class="btn btn-default">Save Spec</a></h4>
+            <h4>{{ item_name }}</h4>
+                <a href="/download/msGraph/{{ download_link}}" class="btn btn-default">Save Spec</a>
+                <div style="display: {{ reapply_hidden }}"><a href="/reapply/msGraph/{{ download_link}}" class="btn btn-default">Reapply</a></div>
             <pre>{{ powershell }}</pre>
             <div>
