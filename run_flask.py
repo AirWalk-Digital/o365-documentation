@@ -245,17 +245,11 @@ def configuration(api, content_data):
 def check_existing(table, api, name):
     # load template
     path = 'config/msGraph/' + api + '/' + name
-    table3d = ''
-    
-
-    # table3d = {}
-
     try:
         # f=open(path,"r")
         with open(path, 'r') as f:
             parsed_json = json.load(f)
         a = np.empty([1,3])
-        sys.stdout.write('line 2 to stdout  ')
         header = ['Setting', 'Vaule', 'Baseline']
         for key, value in table:
             if str(value) == str(parsed_json[key]):
