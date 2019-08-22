@@ -411,14 +411,15 @@ def reapply(path):
     if flask.request.args.get('name') and flask.request.args.get('id'):
         data, existing = generate_replacement_json(flask.request.args.get('id'), path, flask.request.args.get('name'))
         if existing == True:
-            resp = MSGRAPH.post(endpoint, headers=headers, data=data)
+            endpoint = endpoint + '/' + flask.request.args.get('id')
+            resp = MSGRAPH.patch(endpoint, headers=headers, data=data)
             print('-----')
             print(str(resp.status))
             if resp.status == 200:
                 msg = 'Successfully updated policy.'
                 error = 'No error'
             else:
-                msg = 'Error updatging policy.'
+                msg = 'Error updatging policy via ' + endpoint
                 error = str(resp.data)
             return flask.render_template('redirect.html',
                                     message=msg,
@@ -437,6 +438,8 @@ def generate_replacement_json(existing_id, api, name):
             parsed_json = json.load(f)
         existing = True
         parsed_json['id'] = existing_id
+        # del parsed_json['@odata.type']
+        del parsed_json['id']
         jsonpolicy = parsed_json
     except FileNotFoundError:
         existing = False
