@@ -30,10 +30,10 @@ extensions:
 ---
 
 ```bash
-docker run -it --name python -v ~/github/o365-documentation/:/app -p 5001:5001 python bash
+docker run -it --name python -v ~/github/o365-documentation/:/app -p 5002:5002 python bash
 cd /app
-pip install -r requirements.txt
-python flask.py
+pip install -r requirements_all.txt
+python run_flask.py
 
 ```
 

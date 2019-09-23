@@ -9,3 +9,5 @@ adal>=1.0.0
 json2html
 stringcase
 pyyaml
+numpy
+pandas
