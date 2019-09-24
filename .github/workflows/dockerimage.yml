@@ -15,7 +15,7 @@ jobs:
     - uses: AirWalk-Digital/github-action-dockerhub@master
     - name: Build and pushthe Docker image
       run: ./entrypoint.sh
-      secrets:
+      with:
         DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
         DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
