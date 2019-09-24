@@ -16,7 +16,7 @@ jobs:
         DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
         DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       env:
-        DOCKER_NAMESPACE: 'airwalkconsulting'
-        DOCKER_IMAGE_NAME: 'o365-docs'
+        DOCKER_NAMESPACE: airwalkconsulting
+        DOCKER_IMAGE_NAME: o365-docs
 
  
