@@ -14,5 +14,6 @@ jobs:
       with:
         DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
         DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        DOCKER_NAMESPACE: "airwalkconsulting"
 
  
