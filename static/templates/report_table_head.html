@@ -1,7 +1,18 @@
-
-        <div class="container homepage-container">
-            <h4>{{ item_name }}</h4>
-                <a href="/download/msGraph/{{ download_link}}" class="btn btn-default">Save Spec</a>
+        <button type="button" class="collapsible">
+            {% if compliant %}
+            <i class="fa fa-check-circle"></i>
+            {% else %}
+            <i class="fa fa-times"></i>
+            {% endif %}
+            {{ item_name }}<i class="fa fa-eye"></i></button>
+        <div class="content">
+            <div class="buttoncontainer">
+                <a href="/download/msGraph/{{ download_link}}" class="button"><i class="fas fa-cloud-download-alt"></i>Save Spec</a>
+                <div style="display: {{ reapply_hidden }}">
+                    <a href="/reapply/msGraph/{{ download_link}}" class="button"><i class="fas fa-redo"></i>Reapply</a>
+                </div>
+            </div>
+            <!-- <a href="/download/msGraph/{{ download_link}}" class="btn btn-default"><i class="fa fa-cloud-download-alt"></i>Save Spec</a>
                 <div style="display: {{ reapply_hidden }}"><a href="/reapply/msGraph/{{ download_link}}" class="btn btn-default">Reapply</a></div>
-            <pre>{{ powershell }}</pre>
-            <div>
+            <pre>{{ powershell }}</pre> -->
+        <div>

@@ -19,7 +19,8 @@
 <body>
     <h2>{{ message }}.</h2> 
     <div>
-    <p>You will be redirected in <b id="counter">20</b> seconds to {{ location }}</p></div>
+    <p>You will be redirected in <b id="counter">20</b> seconds to {{ location }}</p>
+<p><a href={{ location }} >redirect now</a></p></div>
     <script>
         setInterval(function() {
             var b = document.querySelector("#counter");
@@ -30,7 +31,7 @@
             }
         }, 1000);
     </script>
-    <h4>Error</h4>
+    <h4 hidden={{ noError }}>Error</h4>
     <pre>{{error}}</pre>
     <h4>Data</h4>
     <pre>{{data}}</pre>

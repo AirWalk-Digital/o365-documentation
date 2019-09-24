@@ -10,7 +10,7 @@ import config
 import stringcase
 from requests import get
 from requests_oauthlib import OAuth2Session
-
+from urllib.request import pathname2url
 import datetime
 
 import yaml
@@ -32,7 +32,7 @@ MSGRAPH = OAUTH.remote_app(
     request_token_url=None, access_token_method='POST',
     access_token_url=config.AUTHORITY_URL + config.TOKEN_ENDPOINT,
     authorize_url=config.AUTHORITY_URL + config.AUTH_ENDPOINT)
-
+apply_prefix = '/apply'
 
 @APP.route('/')
 def homepage():
@@ -52,7 +52,8 @@ def authorized():
         raise Exception('state returned to redirect URL does not match!')
     response = MSGRAPH.authorized_response()
     flask.session['access_token'] = response['access_token']
-    return flask.redirect('/test')
+    print('---token: ' + response['access_token'])
+    return flask.redirect('/audit')
 
 @APP.route('/document')
 def document():
@@ -94,6 +95,8 @@ def process():
         return html
     
 def section(section_title):
+    html_top = '<div class="container">'
+    html_bottom = '</div>'
     section_html = '<h2>' + stringcase.titlecase(section_title) + '</h2>'
     # configs = data[section_title]
     html_content = ''
@@ -103,17 +106,18 @@ def section(section_title):
             content_html, code_out = content(section_title, content_data)
             if code_out != 200: code = code_out
             html_content = html_content + content_html
-    return section_html + html_content, code
+    return html_top + section_html + html_content + html_bottom, code
 
 def content(section_title, content_data):
     api_name = content_data['name']
-    section_html = '<h3>' + stringcase.titlecase(api_name) + '</h3>'
     if section_title == 'general':
         apiCall = api_name
     else:
         apiCall = section_title + '/' + api_name
 
-    section_html = section_html + '<p> /' + apiCall + '</p>'
+    section_html = '<h3>' + stringcase.titlecase(api_name) + ' [' + apiCall + ']</h3>'
+
+    # section_html = section_html + ' [' + apiCall + ']'
     # configs = data[section_title]
     # configuration(api_name, content_data)
     # return section_html
@@ -173,11 +177,19 @@ def configuration(api, content_data):
     code = 200
     primary = content_data['primary']
     result = get_api(endpoint)
+    all_results = []
+    configuration_details = np.empty([1,5])
+
+    all_configs, configuration_details = get_baseline(api, primary, configuration_details)
      
     if result.get('value'):
         for item in result['value']:
             item_processed = dict(item.items())
             trimmed = item_processed
+            if item.get(primary):
+                all_results.append(item[primary])
+                link = '<a href=/apply/' + api + '?id=' + str(item['id']) + '&type=api>Apply</a>'
+                configuration_details = np.append(configuration_details, [[str(item[primary]), str(item['id']), 'api', 'tbd' ,link]], axis = 0)
             #remove any key from the 'exclude' section in the config
             if content_data.get('exclude'):
                 for remove_item in content_data['exclude']:
@@ -198,8 +210,11 @@ def configuration(api, content_data):
                 elif str(value) == '[]':
                     del trimmed[key]
 
-            compared_table, existing_policy = check_existing(trimmed.items(), endpoint, item[primary])
+            
 
+            compared_table, existing_policy, compliant = check_existing(trimmed.items(), endpoint, item[primary], primary)
+            print('---------------------------' + item[primary] + '----------------------')
+            print(trimmed.items())
             okstr = '<td>OK</td>'
             okstr_new = '<td bgcolor="#00FF00">OK</td>'
             errorstr = '<td>Error</td>'
@@ -215,39 +230,84 @@ def configuration(api, content_data):
             #         if remove_item in item_processed:
             #             del item_processed[remove_item]    
             # # trim any null, None or empty values
-            # trimmed = trim_vaules(item_processed)
+            # trimmed = trim_values(item_processed)
             # convert the json to a table
             # table = json2html.convert(json = trimmed, table_attributes="class=\"leftheader-table\"")
             # table = json2html.convert(json = compared_table, table_attributes="class=\"leftheader-table\"")
             table = compared_table.to_html(index=False)
             table = table.replace(okstr, okstr_new)
             table = table.replace(errorstr, errorstr_new)
-            if content_data.get('powershell'):
-                cmd = generate_powershell(content_data['powershell'], trimmed )
-            else:
-                cmd = ''
+            
+            # process the @type bit
+            item_name = item[primary]
+            if item.get('@odata.type'):
+                item_type = item['@odata.type'].replace('#microsoft.graph.','')
+                item_name = '[' + stringcase.sentencecase(item_type) + '] ' + item_name
+
             # write the table header with the primary key (usually displayName) as the title
             table_head = flask.render_template('report_table_head.html',
-                                    powershell=cmd,
-                                    download_link=api + '?id=' + item['id'] + '&name=' +item[primary] , 
+                                    download_link=api + '?id=' + item['id'] + '&name=' +item[primary] + '&primary=' + primary, 
+                                    compliant=compliant,
                                     reapply_hidden=hide_reapply,
-                                    item_name=item[primary] )
+                                    item_name=item_name )
             table_foot = flask.render_template('report_table_foot.html')
             html = html + table_head + table + table_foot
     else:
         if result.get('error'):
             if result['error']['code']:
                 result = result['error']['code']
-        table_head = flask.render_template('report_table_head.html',
-                                    powershell='',
-                                    item_name='Bad Structure' )
-        table_foot = flask.render_template('report_table_foot.html') 
-        html = html + table_head + str(result) + table_foot
+        # table_head = flask.render_template('report_table_head.html',
+        #                             powershell='',
+        #                             item_name='No Data' )
+        # table_foot = flask.render_template('report_table_foot.html') 
+        # html = html + table_head  + table_foot
         if result == 'InvalidAuthenticationToken':
             code = 403
 
     
+    missing_config = (set(all_results).difference(all_configs))
+    missing_in_api = (set(all_configs).difference(all_results))
+    header = ['Name', 'ID', 'Location', 'Missing', 'Action']
+    
+    configuration_details = np.delete(configuration_details, 0, axis=0)
+    df = pd.DataFrame(configuration_details,index=configuration_details[:, 0], columns=header)
+    for item in missing_config:
+        df.loc[(df['Name'] == item) & (df['Location'] == 'api'),'Missing'] = 'True'
+    for item in missing_in_api:
+        df.loc[(df['Name'] == item) & (df['Location'] == 'baseline'),'Missing'] = 'True'
+
+    # remove everything else
+    df = df[df.Missing != 'tbd']
+    df = df.drop('ID', axis=1)
+    # prints the missing and additional elements in list2  
+    print("[|" + str(len(missing_in_api)) + "]Missing settings in API:" + str(missing_in_api) ) 
+    print("[|" + str(len(missing_config)) + "]Additional settings in API (not in baseline):" + str(missing_config))
+
+    if len(missing_in_api) > 0:
+        html = html + '<button type="button" class="collapsible"><i class="fa fa-exclamation-triangle"></i>Missing Configuration<i class="fa fa-eye"></i></button><div class="content">' + df.to_html(index=False,escape=False) + '</div>'
+        # html = html + '<h5>Missing Configuration</h5><p>Configuration that is in the saved baseline, but is not applied to the live environment</p>' + df.to_html(index=False,escape=False)
+
     return html, code
+
+def get_baseline(api, primary, configuration_details):
+    all_configs = []
+    path = 'config/msGraph/' + api
+    with os.scandir(path) as entries:
+        for entry in entries:
+            with open(entry, 'r') as f:
+                parsed_json = json.load(f)
+                all_configs.append(parsed_json[primary])
+                link = '<a href=/post/msGraph/' + api + '?id=' + pathname2url(str(entry.name)) + '&type=baseline> Apply </a>'
+                configuration_details = np.append(configuration_details, [[str(parsed_json[primary]), str(entry.name), 'baseline', 'tbd' , link]], axis = 0)
+
+    return all_configs, configuration_details
+def getfile(file):
+    try:
+        with open(file, 'r') as f:
+            parsed_json = json.load(f)
+            return parsed_json
+    except FileNotFoundError:
+        return "{'error': 'file not found'}"
 
 def trim_policy(item_processed, content_data):
     trimmed = item_processed
@@ -272,20 +332,45 @@ def trim_policy(item_processed, content_data):
             del trimmed[key]
     return trimmed
 
-def check_existing(table, api, name):
+def find_file_by_name(api, name, primary):
+    path = 'config/msGraph/' + api
+    rreturn = ''
+    with os.scandir(path) as entries:
+        for entry in entries:
+            with open(entry, 'r') as f:
+                parsed_json = json.load(f)
+                if parsed_json[primary] == name:
+                    rreturn = f.name
+    return rreturn
+
+
+
+
+def check_existing(table, api, name, primary):
     # load template
-    path = 'config/msGraph/' + api + '/' + name
+    path = find_file_by_name(api, name, primary)
+    compliant = True
     try:
         # f=open(path,"r")
         with open(path, 'r') as f:
             parsed_json = json.load(f)
         a = np.empty([1,3])
-        header = ['Setting', 'Vaule', 'Baseline']
+        header = ['Setting', 'Value', 'Baseline']
         for key, value in table:
-            if str(value) == str(parsed_json[key]):
-                good = 'OK'
-            else: 
+            if key in parsed_json:
+                if str(value).lower() == str(parsed_json[key]).lower():
+                    good = 'OK'
+                elif value == True and parsed_json[key] == True:
+                    good = 'OK'
+                elif value == False and parsed_json[key] == False:
+                    good = 'OK'
+                else:
+                    print(parsed_json[key])
+                    good = 'Error'
+                    compliant = False
+            else:
                 good = 'Error'
+                compliant = False
             a = np.append(a, [[str(key), str(value), good ]], axis = 0)
 
         a = np.delete(a, 0, axis=0)
@@ -294,19 +379,29 @@ def check_existing(table, api, name):
         existing = True
     except FileNotFoundError:
         a = np.empty([1,2])
-        header = ['Setting', 'Vaule']
+        header = ['Setting', 'Value']
         for key, value in table:
             a = np.append(a, [[str(key), str(value)]], axis = 0)
         a = np.delete(a, 0, axis=0) # delete the empty first row
         df = pd.DataFrame(a, columns=header)
         existing = False
-    return df, existing
+    return df, existing, compliant
+
+def missing_in_api_table(api, missing_in_api):
+    a = np.empty([1,2])
+    header = ['Setting', 'Action']
+    for item in missing_in_api:
+        url = '<a href=/apply_missing__api/' + stringcase.alphanumcase(item) + '> Apply </a>'
+        a = np.append(a, [[str(item), str(url) ]], axis = 0)
+    a = np.delete(a, 0, axis=0)
+    df = pd.DataFrame(a,index=a[:, 0], columns=header)
+    df.set_index(df.columns[0])    
+    return df
 
 
 
 
-
-def trim_vaules(item_processed):
+def trim_values(item_processed):
     trimmed = item_processed
     for key, value in item_processed.copy().items():
         if str(value) == 'None':
@@ -341,7 +436,6 @@ def generate_powershell_old(powershell, item_processed ):
 
     cmd = cmd + "}\n" + powershell + " $hashtable"
     return cmd
-
 def generate_powershell(powershell, item_processed ):
     # cmd = powershell
     cmd = powershell + " "
@@ -362,8 +456,8 @@ def generate_powershell(powershell, item_processed ):
 @APP.route('/msGraph/<path:path>')
 def proxy(path):
     endpoint = path
-    headers = {'SdkVersion': 'sample-python-flask',
-               'x-client-SKU': 'sample-python-flask',
+    headers = {'SdkVersion': 'ms365-documentation',
+               'x-client-SKU': 'ms365-documentation',
                'client-request-id': str(uuid.uuid4()),
                'return-client-request-id': 'true'}
     return MSGRAPH.get(endpoint, headers=headers).data
@@ -371,14 +465,14 @@ def proxy(path):
 @APP.route('/download/msGraph/<path:path>')
 def download(path):
     endpoint = path
-    headers = {'SdkVersion': 'sample-python-flask',
-               'x-client-SKU': 'sample-python-flask',
+    headers = {'SdkVersion': 'ms365-documentation',
+               'x-client-SKU': 'ms365-documentation',
                'client-request-id': str(uuid.uuid4()),
                'return-client-request-id': 'true'}
     graph = MSGRAPH.get(endpoint, headers=headers).data
     error = "{'error': {'code': 'invalidParams','message': 'Invalid Parameters passed to download API','innerError': {'request-id': 'TBD','date': '" + str(datetime.datetime.now()) +"'} } }"
     if flask.request.args.get('name') and flask.request.args.get('id'):    
-        filename = 'config/msGraph/' + path + '/' + flask.request.args.get('name')
+        filename = 'config/msGraph/' + path + '/' + flask.request.args.get('name').replace(' ','') + '.json'
         itemtosave = graph['value']
         itemtosave = [itemtosave for itemtosave in itemtosave if itemtosave['id'] == flask.request.args.get('id')][0]
         savefile(filename, itemtosave)
@@ -402,22 +496,23 @@ def savefile(path, data):
 @APP.route('/reapply/msGraph/<path:path>') # reapply from the template
 def reapply(path):
     endpoint = path
-    headers = {'SdkVersion': 'sample-python-flask',
-               'x-client-SKU': 'sample-python-flask',
+    headers = {'SdkVersion': 'ms365-documentation',
+               'x-client-SKU': 'ms365-documentation',
+               'Content-type': 'application/json',
                'client-request-id': str(uuid.uuid4()),
                'return-client-request-id': 'true'}
-    graph = MSGRAPH.get(endpoint, headers=headers).data
     error = "{'error': {'code': 'invalidParams','message': 'Invalid Parameters passed to download API','innerError': {'request-id': 'TBD','date': '" + str(datetime.datetime.now()) +"'} } }"
-    if flask.request.args.get('name') and flask.request.args.get('id'):
-        data, existing = generate_replacement_json(flask.request.args.get('id'), path, flask.request.args.get('name'))
+    if flask.request.args.get('name') and flask.request.args.get('id') and flask.request.args.get('primary'):
+        data, existing = generate_replacement_json(flask.request.args.get('id'), path, flask.request.args.get('name'),flask.request.args.get('primary'))
         if existing == True:
             endpoint = endpoint + '/' + flask.request.args.get('id')
-            resp = MSGRAPH.patch(endpoint, headers=headers, data=data)
+            print(json.dumps(data))
+            resp = MSGRAPH.patch(endpoint, headers=headers, data=data, format='json')
             print('-----')
             print(str(resp.status))
-            if resp.status == 200:
+            if resp.status == 200 or resp.status == 201 or resp.status == 204:
                 msg = 'Successfully updated policy.'
-                error = 'No error'
+                error = ''
             else:
                 msg = 'Error updatging policy via ' + endpoint
                 error = str(resp.data)
@@ -429,9 +524,48 @@ def reapply(path):
     else:
         return error    
 
-def generate_replacement_json(existing_id, api, name):
+
+    
+@APP.route('/post/msGraph/<path:path>') # reapply from the template
+def post_create(path):
+    endpoint = path
+    headers = {'SdkVersion': 'ms365-documentation',
+               'x-client-SKU': 'ms365-documentation',
+               'Content-type': 'application/json',
+               'client-request-id': str(uuid.uuid4()),
+               'return-client-request-id': 'true'}
+    error = "{'error': {'code': 'invalidParams','message': 'Invalid Parameters passed to download API','innerError': {'request-id': 'TBD','date': '" + str(datetime.datetime.now()) +"'} } }"
+    if flask.request.args.get('type') and flask.request.args.get('id'):
+        if flask.request.args.get('type') == 'baseline':
+            data = getfile('config/msGraph/' + path + '/' + flask.request.args.get('id'))
+            resp = MSGRAPH.post(endpoint, headers=headers, data=data, format='json')
+            
+            print(str(resp.status))
+            if resp.status == 200 or resp.status == 201 or resp.status == 204:
+                msg = 'Successfully updated policy.'
+                error = ''
+                noerror = True
+            else:
+                msg = 'Error updatging policy via ' + endpoint
+                error = str(resp.data)
+                noerror = False
+            return flask.render_template('redirect.html',
+                                    message=msg,
+                                    noError=noerror,
+                                    location=flask.request.referrer,
+                                    error=error,
+                                    data=str(data))
+        else:
+            return error
+    else:
+        return error    
+
+
+def generate_replacement_json(existing_id, api, name, primary):
+
+    path = find_file_by_name(api, name, primary)
     # load template
-    path = 'config/msGraph/' + api + '/' + name
+    # path = 'config/msGraph/' + api + '/' + name
     jsonpolicy = ''
     try:
         with open(path, 'r') as f:
@@ -439,7 +573,7 @@ def generate_replacement_json(existing_id, api, name):
         existing = True
         parsed_json['id'] = existing_id
         # del parsed_json['@odata.type']
-        del parsed_json['id']
+        # del parsed_json['id']
         jsonpolicy = parsed_json
     except FileNotFoundError:
         existing = False
@@ -451,15 +585,26 @@ def deviceManagement_deviceConfigurations():
     """Confirm user authentication by calling Graph and displaying some data."""
     endpoint = 'me'
     endpoint = 'deviceManagement/deviceConfigurations'
-    headers = {'SdkVersion': 'sample-python-flask',
-               'x-client-SKU': 'sample-python-flask',
+    headers = {'SdkVersion': 'ms365-documentation',
+               'x-client-SKU': 'ms365-documentation',
+               'client-request-id': str(uuid.uuid4()),
+               'return-client-request-id': 'true'}
+    return MSGRAPH.get(endpoint, headers=headers).data
+    
+@APP.route('/me')
+def me():
+    """Confirm user authentication by calling Graph and displaying some data."""
+    endpoint = 'me'
+    headers = {'SdkVersion': 'ms365-documentation',
+               'x-client-SKU': 'ms365-documentation',
                'client-request-id': str(uuid.uuid4()),
                'return-client-request-id': 'true'}
     return MSGRAPH.get(endpoint, headers=headers).data
     
 
-@APP.route('/test')
-def testing():
+
+@APP.route('/audit')
+def process_audit():
     return process()
   
 
@@ -469,4 +614,4 @@ def get_token():
     return (flask.session.get('access_token'), '')
 
 if __name__ == '__main__':
-    APP.run(host="0.0.0.0",port=5001)
+    APP.run(host="0.0.0.0",port=5002)

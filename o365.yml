@@ -2,17 +2,36 @@
 general:
   - name: groups
     primary: displayName
-    # powershell: New-DeviceManagement_DeviceConfigurations
+    exclude:
+      - id
+      - lastModifiedDateTime
+      - createdDateTime
+      - version
+      - renewedDateTime
 
 deviceManagement:
   - name: deviceConfigurations
     primary: displayName
     powershell: New-DeviceManagement_DeviceConfigurations
     exclude:
-      # - '@odata.type'
       - id
       - lastModifiedDateTime
       - createdDateTime
       - version
-      - edgeHomepageUrls # Temp
 
+deviceAppManagement:
+  - name: androidManagedAppProtections
+    primary: displayName
+    exclude:
+      - id
+      - lastModifiedDateTime
+      - createdDateTime
+      - version
+
+  - name: iosManagedAppProtections
+    primary: displayName
+    exclude:
+      - id
+      - lastModifiedDateTime
+      - createdDateTime
+      - version  
