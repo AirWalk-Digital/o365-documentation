@@ -18,7 +18,7 @@ REDIRECT_URI = os.environ['REDIRECT_URI']
 # /organizations = organizational accounts only
 # /consumers = MSAs only (Microsoft Accounts - Live.com, Hotmail.com, etc.)
 # /common = allow both types of accounts
-AUTHORITY_URL = 'https://login.microsoftonline.com/' + TENNANT_ID
+AUTHORITY_URL = 'https://login.microsoftonline.com/' + AZURE_TENANT_ID
 
 AUTH_ENDPOINT = '/oauth2/v2.0/authorize'
 TOKEN_ENDPOINT = '/oauth2/v2.0/token'
