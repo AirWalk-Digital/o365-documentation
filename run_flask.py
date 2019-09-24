@@ -188,7 +188,7 @@ def configuration(api, content_data):
             trimmed = item_processed
             if item.get(primary):
                 all_results.append(item[primary])
-                link = '<a href=/download/msGraph/' + api + '?id=' + str(item['id']) + '&type=api&name=' + item[primary] + '&primary=' + primary + '><i class="fas fa-cloud-download-alt"></i>Download</a>'
+                link = '<a href=/download/msGraph/' + api + '?id=' + str(item['id']) + '&type=api&name=' + pathname2url(item[primary]) + '&primary=' + primary + '><i class="fas fa-cloud-download-alt"></i>Download</a>'
                 configuration_details = np.append(configuration_details, [[str(item[primary]), str(item['id']), 'api', 'tbd' ,link]], axis = 0)
             #remove any key from the 'exclude' section in the config
             if content_data.get('exclude'):
