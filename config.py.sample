@@ -24,7 +24,7 @@ AUTH_ENDPOINT = '/oauth2/v2.0/authorize'
 TOKEN_ENDPOINT = '/oauth2/v2.0/token'
 
 RESOURCE = 'https://graph.microsoft.com/'
-API_VERSION = 'v1.0'
+API_VERSION = 'Beta'
 SCOPES = ['User.Read'] # Add other scopes/permissions as needed.
 
 
