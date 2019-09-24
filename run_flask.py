@@ -188,7 +188,7 @@ def configuration(api, content_data):
             trimmed = item_processed
             if item.get(primary):
                 all_results.append(item[primary])
-                link = '<a href=/apply/' + api + '?id=' + str(item['id']) + '&type=api>Apply</a>'
+                link = '<a href=/download/msGraph/' + api + '?id=' + str(item['id']) + '&type=api&name=' + item[primary] + '&primary=' + primary + '><i class="fas fa-cloud-download-alt"></i>Download</a>'
                 configuration_details = np.append(configuration_details, [[str(item[primary]), str(item['id']), 'api', 'tbd' ,link]], axis = 0)
             #remove any key from the 'exclude' section in the config
             if content_data.get('exclude'):
@@ -279,6 +279,8 @@ def configuration(api, content_data):
     # remove everything else
     df = df[df.Missing != 'tbd']
     df = df.drop('ID', axis=1)
+    df = df.drop('Location', axis=1)
+    df = df.drop('Missing', axis=1)
     # prints the missing and additional elements in list2  
     print("[|" + str(len(missing_in_api)) + "]Missing settings in API:" + str(missing_in_api) ) 
     print("[|" + str(len(missing_config)) + "]Additional settings in API (not in baseline):" + str(missing_config))
@@ -298,7 +300,7 @@ def get_baseline(api, primary, configuration_details):
                 with open(entry, 'r') as f:
                     parsed_json = json.load(f)
                     all_configs.append(parsed_json[primary])
-                    link = '<a href=/post/msGraph/' + api + '?id=' + pathname2url(str(entry.name)) + '&type=baseline> Apply </a>'
+                    link = '<a href=/post/msGraph/' + api + '?id=' + pathname2url(str(entry.name)) + '&type=baseline><i class="fas fa-angle-double-up"></i>Apply</a>'
                     configuration_details = np.append(configuration_details, [[str(parsed_json[primary]), str(entry.name), 'baseline', 'tbd' , link]], axis = 0)
     except FileNotFoundError:
         print('file not found' + path)
@@ -337,12 +339,15 @@ def trim_policy(item_processed, content_data):
 def find_file_by_name(api, name, primary):
     path = 'config/msGraph/' + api
     rreturn = ''
-    with os.scandir(path) as entries:
-        for entry in entries:
-            with open(entry, 'r') as f:
-                parsed_json = json.load(f)
-                if parsed_json[primary] == name:
-                    rreturn = f.name
+    try:
+        with os.scandir(path) as entries:
+            for entry in entries:
+                with open(entry, 'r') as f:
+                    parsed_json = json.load(f)
+                    if parsed_json[primary] == name:
+                        rreturn = f.name
+    except FileNotFoundError:
+        print('file not found' + path)
     return rreturn
 
 
@@ -387,6 +392,7 @@ def check_existing(table, api, name, primary):
         a = np.delete(a, 0, axis=0) # delete the empty first row
         df = pd.DataFrame(a, columns=header)
         existing = False
+        compliant = False
     return df, existing, compliant
 
 def missing_in_api_table(api, missing_in_api):
