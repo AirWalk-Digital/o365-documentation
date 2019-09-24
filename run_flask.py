@@ -292,14 +292,16 @@ def configuration(api, content_data):
 def get_baseline(api, primary, configuration_details):
     all_configs = []
     path = 'config/msGraph/' + api
-    with os.scandir(path) as entries:
-        for entry in entries:
-            with open(entry, 'r') as f:
-                parsed_json = json.load(f)
-                all_configs.append(parsed_json[primary])
-                link = '<a href=/post/msGraph/' + api + '?id=' + pathname2url(str(entry.name)) + '&type=baseline> Apply </a>'
-                configuration_details = np.append(configuration_details, [[str(parsed_json[primary]), str(entry.name), 'baseline', 'tbd' , link]], axis = 0)
-
+    try:
+        with os.scandir(path) as entries:
+            for entry in entries:
+                with open(entry, 'r') as f:
+                    parsed_json = json.load(f)
+                    all_configs.append(parsed_json[primary])
+                    link = '<a href=/post/msGraph/' + api + '?id=' + pathname2url(str(entry.name)) + '&type=baseline> Apply </a>'
+                    configuration_details = np.append(configuration_details, [[str(parsed_json[primary]), str(entry.name), 'baseline', 'tbd' , link]], axis = 0)
+    except FileNotFoundError:
+        print('file not found' + path)
     return all_configs, configuration_details
 def getfile(file):
     try:

@@ -14,7 +14,7 @@ Using docker, run the following:
 
 ```bash
 
-export CONFIG_PATH= [the location where you want to store your config files]
+export CONFIG_PATH= [the location where you want to store your config files (before /msGraph)]
 
 docker run -d \
   -e "AZURE_TENANT_ID=YOUR_TENNANT_ID" \
