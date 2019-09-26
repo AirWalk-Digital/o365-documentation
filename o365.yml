@@ -12,7 +12,13 @@ general:
 deviceManagement:
   - name: deviceConfigurations
     primary: displayName
-    powershell: New-DeviceManagement_DeviceConfigurations
+    exclude:
+      - id
+      - lastModifiedDateTime
+      - createdDateTime
+      - version
+  - name: templates
+    primary: displayName
     exclude:
       - id
       - lastModifiedDateTime

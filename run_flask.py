@@ -5,6 +5,8 @@ import uuid
 
 import flask
 from flask_oauthlib.client import OAuth
+from flask import session, request, redirect
+
 from json2html import *
 import config
 import stringcase
@@ -12,6 +14,8 @@ from requests import get
 from requests_oauthlib import OAuth2Session
 from urllib.request import pathname2url
 import datetime
+from urllib.parse import urlparse
+
 
 import yaml
 import json
@@ -43,6 +47,10 @@ def homepage():
 def login():
     """Prompt user to authenticate."""
     flask.session['state'] = str(uuid.uuid4())
+    if urlparse(request.headers.get("Referer")).netloc == urlparse(config.REDIRECT_URI).netloc:
+        flask.session['referrer'] = request.headers.get("Referer")
+    else:
+        flask.session['referrer'] = urlparse(config.REDIRECT_URI).netloc
     return MSGRAPH.authorize(callback=config.REDIRECT_URI, state=flask.session['state'])
 
 @APP.route('/login/authorized')
