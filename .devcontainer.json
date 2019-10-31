@@ -5,6 +5,9 @@
 	"extensions": ["ms-python.python", "amazonwebservices.aws-toolkit-vscode"],
 	"runArgs": [
 		// Mount config directory
-		"-v", "${env:HOME}${env:USERPROFILE}/github/modern-workplace-demo/graphapi/configs:/workspaces/o365-documentation/config"
+		"-v", "${env:HOME}${env:USERPROFILE}/github/modern-workplace-demo/graphapi/configs:/workspaces/o365-documentation/config",
+		// Mount .ssh directories (so git can still work)
+		"-v", "${env:HOME}${env:USERPROFILE}/.ssh/id_rsa:/root/.ssh-localhost/id_rsa:ro"
+
 	]
 }
