@@ -2,7 +2,7 @@
 // https://aka.ms/vscode-dev-containers/definitions for sample configurations.
 {
 	"dockerFile": "Dockerfile",
-	"extensions": ["ms-python.python", "amazonwebservices.aws-toolkit-vscode"],
+	"extensions": ["ms-python.python"],
 	"runArgs": [
 		// Mount config directory
 		"-v", "${env:HOME}${env:USERPROFILE}/github/modern-workplace-demo/graphapi/configs:/workspaces/o365-documentation/config",

@@ -25,6 +25,24 @@ deviceManagement:
       - createdDateTime
       - version
 
+  - name: mobileThreatDefenseConnectors
+    primary: displayName
+    exclude:
+      - id
+      - lastModifiedDateTime
+      - createdDateTime
+      - version
+
+  - name: groupPolicyConfigurations
+    primary: displayName
+    exclude:
+      - id
+      - lastModifiedDateTime
+      - createdDateTime
+      - version
+
+
+
 deviceAppManagement:
   - name: androidManagedAppProtections
     primary: displayName
@@ -41,3 +59,28 @@ deviceAppManagement:
       - lastModifiedDateTime
       - createdDateTime
       - version
+
+  - name: mobileApps
+    primary: displayName
+    exclude:
+      - id
+      - lastModifiedDateTime
+      - createdDateTime
+      - version
+
+  - name : managedAppPolicies
+    primary: displayName
+    exclude:
+      - id
+      - lastModifiedDateTime
+      - createdDateTime
+      - version
+
+  - name : mobileAppConfigurations
+    primary: displayName
+    exclude:
+      - id
+      - lastModifiedDateTime
+      - createdDateTime
+      - version
+
