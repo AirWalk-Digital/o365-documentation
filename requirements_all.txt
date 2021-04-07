@@ -1,6 +1,6 @@
 adal==1.2.2
 asn1crypto==0.24.0
-bottle==0.12.17
+bottle==0.12.19
 certifi==2019.9.11
 cffi==1.12.3
 chardet==3.0.4
